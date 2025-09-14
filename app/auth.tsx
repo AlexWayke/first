@@ -13,7 +13,7 @@ export default function AuthScreen() {
   const theme = useTheme();
   const router = useRouter()
 
-  const {signIn, signUp} = useAuth();
+  const {signUp, signIn} = useAuth();
   
   const handleSwitchMode = () => {
     setIsSignUp((curr) => !curr);
@@ -32,16 +32,13 @@ export default function AuthScreen() {
 
     setError(null);
 
-    if(signUp){
+    if(isSignUp){
       const error = await signUp(email, password);
       if(error){
         setError(error);
       }
     } else {
-      const error = await signIn(email, password);
-      if(error){
-        setError(error);
-      }
+      await signIn(email, password);
 
       router.replace('/');
     }
@@ -93,7 +90,7 @@ export default function AuthScreen() {
           onPress={handleSwitchMode}
           style={styles.switchModeButton}
         >
-          {isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Un"}
+          {isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up"}
         </Button>
       </View>
     </KeyboardAvoidingView>
