@@ -3,6 +3,7 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
 import { PaperProvider } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 function RouteProtecter ({children}: {children: React.ReactNode}) {
   const router = useRouter();
@@ -27,14 +28,16 @@ function RouteProtecter ({children}: {children: React.ReactNode}) {
 export default function RootLayout() {
   
   return (
-    <AuthProvider>
-      <PaperProvider>
-        <SafeAreaProvider>
-          <RouteProtecter>
-            <Stack.Screen name="(tabs)" options={{headerShown: false}} />
-          </RouteProtecter>
-        </SafeAreaProvider>
-      </PaperProvider>
-    </AuthProvider>
+    <GestureHandlerRootView style={{flex: 1}}>
+      <AuthProvider>
+        <PaperProvider>
+          <SafeAreaProvider>
+            <RouteProtecter>
+              <Stack.Screen name="(tabs)" options={{headerShown: false}} />
+            </RouteProtecter>
+          </SafeAreaProvider>
+        </PaperProvider>
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }
