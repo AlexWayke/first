@@ -32,7 +32,7 @@ export default function AddHabitScreen(){
         description,
         frequency,
         streak_count: 0,
-        last_completed: new Date().toISOString(),
+        last_completed: new Date(0).toISOString(),
         $createdAt: new Date().toISOString(),
       }
     );

@@ -1,9 +1,9 @@
 import { client, COMPLETIONS_COLLECTION_ID, DATABASE_ID, databases, HABITS_COLLECTION_ID, RealtimeResponse } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
-import { Habit, HabitCompletion } from "@/types/database.type";
+import { Habit } from "@/types/database.type";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Query } from "appwrite";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, StyleSheet, ScrollView } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import { Text, Button, Surface } from "react-native-paper";
@@ -11,7 +11,6 @@ import { Text, Button, Surface } from "react-native-paper";
 export default function Index() {
   const { signOut, user } = useAuth();
   const [habits, setHabits] = useState<Habit[]>();
-  const [completedHabits, setCompletedHabits] = useState<string[]>();
 
   const swipeableRefs = useRef<{[key: string]: Swipeable | null}>({})
 
@@ -29,25 +28,14 @@ export default function Index() {
     }
   }, [user?.$id]);
 
-  const fetchTodayCompletions = useCallback(async () => {
-    try{
-      const today = new Date();
-      today.setHours(0, 0, 0, 0)
-      const response = await databases.listDocuments(
-        DATABASE_ID!, 
-        COMPLETIONS_COLLECTION_ID!,
-        [
-          Query.equal("user_id", user?.$id ?? ""), 
-          Query.greaterThanEqual("completed_at", today.toISOString())
-        ]
-      );
+  const completedHabits = useMemo(() => {
+    const currentDate = new Date().toISOString();
+    if(!habits) return;
 
-      const completions = response.documents as HabitCompletion[];
-      setCompletedHabits(completions.map((c) => c.habit_id));
-    } catch (error) {
-      console.error(error)
-    }
-  }, [user?.$id]);
+    return habits
+      .filter((habit) => currentDate.split('T')[0] === habit.last_completed.split('T')[0])
+      .map((habit) => habit.$id)
+  }, [habits]);
 
   useEffect(() => {
     if (user) {
@@ -60,23 +48,14 @@ export default function Index() {
           fetchHabits();
         }
       });
-      
-      const completionsChannel = `databases.${DATABASE_ID}.collections.${COMPLETIONS_COLLECTION_ID}.documents`;
-      const completionsSubscription = client.subscribe(completionsChannel, (response: RealtimeResponse) => {
-        if (response.events.includes("databases.*.collections.*.documents.*.create")) {
-          fetchTodayCompletions();
-        }
-      });
 
       fetchHabits();
-      fetchTodayCompletions();
 
       return () => {
         habitSubscription();
-        completionsSubscription();
       }
     }
-  }, [fetchHabits, fetchTodayCompletions, user])
+  }, [fetchHabits, user]);
 
   const renderLeftActions = () => (
     <View style={styles.swipeActionLeft}>
@@ -112,31 +91,24 @@ export default function Index() {
   const handleCompleteHabit = async (id: string) => {
     if (!user || completedHabits?.includes(id)) return;
     try {
-      const currentDate = new Date();
+      const currentDate = new Date().toISOString();
       const habit = habits?.find((h) => h.$id === id);
-
-      await databases.createDocument({
-        databaseId: DATABASE_ID!, 
-        collectionId: COMPLETIONS_COLLECTION_ID!, 
-        documentId: id,
-        data: {
-          habit_id: id,
-          user_id: user?.$id,
-          completed_at: currentDate.toISOString(),
-        }
-      })
-
-      if(!habit) return;
+      console.log('habit', habit)
       
+      if (!habit) return;
+      const habitUpdatedDate = habit.last_completed;
+      
+      if(currentDate.split('T')[0] === habitUpdatedDate.split('T')[0]) return;
       await databases.updateDocument(
         DATABASE_ID!,
         HABITS_COLLECTION_ID!, 
         id, 
         {
           streak_count: habit.streak_count + 1,
-          last_completed: currentDate.toISOString(),
+          last_completed: currentDate,
         }
       )
+
     } catch(err) {
       console.error(err);
     }
