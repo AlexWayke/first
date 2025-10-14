@@ -33,7 +33,7 @@ export default function RootLayout() {
         <PaperProvider>
           <SafeAreaProvider>
             <RouteProtecter>
-              <Stack.Screen name="(tabs)" options={{headerShown: false}} />
+              <Stack.Screen name="(tabs)" options={{headerShown: false}}  />
             </RouteProtecter>
           </SafeAreaProvider>
         </PaperProvider>

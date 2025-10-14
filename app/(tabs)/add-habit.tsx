@@ -22,20 +22,21 @@ export default function AddHabitScreen(){
     if(!user) return;
 
     try {
-      await databases.createDocument(
-      DATABASE_ID!, 
-      HABITS_COLLECTION_ID!, 
-      ID.unique(),
-      {
+      await databases.createRow({
+      databaseId: DATABASE_ID!, 
+      tableId: HABITS_COLLECTION_ID!, 
+      rowId: ID.unique(),
+      data: {
         user_id: user.$id,
         title,
         description,
         frequency,
         streak_count: 0,
-        last_completed: new Date().toISOString(),
+        best_streak: 0,
+        last_completed: new Date(0).toISOString(),
         $createdAt: new Date().toISOString(),
       }
-    );
+    });
 
     router.back();
     } catch (error) {
