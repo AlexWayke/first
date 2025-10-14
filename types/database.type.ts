@@ -1,17 +1,12 @@
 import { Models } from "appwrite";
 
-export interface Habit extends Models.DefaultDocument {
+export interface Habit extends Models.DefaultRow {
   user_id: string;
   title: string;
   description: string;
   frequency: string;
   streak_count: number;
   last_completed: string;
+  best_streak: number;
   $created_at: string;
-}
-
-export interface HabitCompletion extends Models.DefaultDocument {
-  habit_id: string;
-  user_id: string;
-  completed_at: string;
 }

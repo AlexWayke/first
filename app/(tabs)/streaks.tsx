@@ -1,46 +1,24 @@
-import { client, COMPLETIONS_COLLECTION_ID, DATABASE_ID, databases, HABITS_COLLECTION_ID } from "@/lib/appwrite";
+import { DATABASE_ID, databases, HABITS_COLLECTION_ID } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
-import { Habit, HabitCompletion } from "@/types/database.type";
+import { Habit } from "@/types/database.type";
 import { Query } from "appwrite";
 import { useCallback, useEffect, useState } from "react";
 import { View, StyleSheet, ScrollView } from "react-native";
 import { Card, Text } from "react-native-paper";
 
-interface StreakData {
-  streak: number;
-  bestStreak: number;
-  total: number;
-}
-
 export default function StreaksScreen(){
-  const { signOut, user } = useAuth();
+  const { user } = useAuth();
   const [habits, setHabits] = useState<Habit[]>([]);
-  const [completedHabits, setCompletedHabits] = useState<HabitCompletion[]>([]);
   
     const fetchHabits = useCallback(async () => {
       try{
-        const response = await databases.listDocuments(
-          DATABASE_ID!, 
-          HABITS_COLLECTION_ID!,
-          [Query.equal("user_id", user?.$id ?? "")]
-        );
+        const response = await databases.listRows({
+          databaseId: DATABASE_ID!, 
+          tableId: HABITS_COLLECTION_ID!,
+          queries: [Query.equal("user_id", user?.$id ?? "")]
+        });
   
-        setHabits(response.documents as Habit[]);
-      } catch (error) {
-        console.error(error)
-      }
-    }, [user?.$id]);
-  
-    const fetchCompletions = useCallback(async () => {
-      try{
-        const response = await databases.listDocuments(
-          DATABASE_ID!, 
-          COMPLETIONS_COLLECTION_ID!,
-          [Query.equal("user_id", user?.$id ?? "")]
-        );
-  
-        const completions = response.documents as HabitCompletion[];
-        setCompletedHabits(completions);
+        setHabits(response.rows as Habit[]);
       } catch (error) {
         console.error(error)
       }
@@ -49,60 +27,11 @@ export default function StreaksScreen(){
   useEffect(() => {
     if (user) {
       fetchHabits();
-      fetchCompletions();
     }
+    
+  }, [fetchHabits,user]);
 
-    return  () => {
-      fetchHabits();
-      fetchCompletions();
-    }
-  }, [fetchHabits, fetchCompletions, user])
-
-  const getStreakData = (habitId: string): StreakData => {
-    const habitCompletions = completedHabits
-      ?.filter((c) => c.habit_id === habitId)
-      .sort((a, b) => new Date(a.completed_at).getTime() - new Date(b.completed_at).getTime());
-
-    if (habitCompletions?.length === 0) {
-      return {streak: 0, bestStreak: 0, total: 0};
-    }
-
-    //build streak data
-    let streak = 0;
-    let bestStreak = 0;
-    let total = habitCompletions.length;
-
-    let lastDate: Date | null = null;
-    let currentStreak = 0;
-
-    habitCompletions?.forEach((c) => {
-      const date = new Date(c.completed_at);
-      if (lastDate) {
-        const diff = (date.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24);
-
-        if(diff <= 1.5) {
-          currentStreak += 1
-        } else {
-          currentStreak = 1
-        }
-      } else {
-        currentStreak = 1;
-      }
-
-      if (currentStreak > bestStreak) bestStreak = currentStreak; 
-      streak = currentStreak;
-      lastDate = date;
-    })
-
-    return {streak, bestStreak, total};
-  };
-
-  const habitStreaks = habits.map((habit) => {
-    const {streak, bestStreak, total} = getStreakData(habit.$id);
-    return {habit, bestStreak, streak, total}
-  });
-
-  const rankedHabits = habitStreaks.sort((a, b) => b.bestStreak = a.bestStreak);
+  const rankedHabits = habits.sort((a, b) => b.streak_count = a.streak_count);
   const badgeStyles = [styles.badge1, styles.badge2, styles.badge3];
 
   return (
@@ -113,12 +42,12 @@ export default function StreaksScreen(){
         <View style={styles.rankingContainer}>
           <Text style={styles.rankingTitle}>🎖️ Top Streaks</Text>
           {rankedHabits.slice(0, 3).map((item, index) => (
-            <View key={item.habit.$id} style={styles.rankingRow}>
+            <View key={item.$id} style={styles.rankingRow}>
               <View style={[styles.rankingBadge, badgeStyles[index]]}>
                 <Text style={styles.rankingBadgeText}>{index + 1}</Text>
               </View>
-              <Text style={styles.rankingHabit}>{item.habit.title}</Text>
-              <Text style={styles.rankingStreak}>{item.bestStreak}</Text>
+              <Text style={styles.rankingHabit}>{item.title}</Text>
+              <Text style={styles.rankingStreak}>{item.best_streak}</Text>
             </View>
           ))}
         </View>
@@ -130,22 +59,22 @@ export default function StreaksScreen(){
           </View>
         ) : (
           <ScrollView showsVerticalScrollIndicator={false}>
-            {rankedHabits.map(({habit, streak, bestStreak, total}, index) => (
+            {rankedHabits.map((habit, index) => (
               <Card key={habit.$id} style={[styles.card, index === 0 && styles.firstCard]}>
                 <Card.Content>
                   <Text variant="titleMedium" style={styles.habitTitle}>{habit.title}</Text>
                   <Text style={styles.habitDescription}>{habit.description}</Text>
                   <View style={styles.statRow}>
                     <View style={styles.statBadge}>
-                      <Text style={styles.statBadgeText}>🔥 {streak}</Text>
+                      <Text style={styles.statBadgeText}>🔥 {habit.streak_count}</Text>
                       <Text style={styles.statLabel}>Current</Text>
                     </View>
                     <View style={styles.statBadgeGold}>
-                      <Text style={styles.statBadgeText}>🏆 {bestStreak}</Text>
+                      <Text style={styles.statBadgeText}>🏆 {habit.best_streak}</Text>
                       <Text style={styles.statLabel}>Best</Text>
                     </View>
                     <View style={styles.statBadgeGreen}>
-                      <Text style={styles.statBadgeText}>✅ {total}</Text>
+                      <Text style={styles.statBadgeText}>✅ {habit.best_streak}</Text>
                       <Text style={styles.statLabel}>Total</Text>
                     </View>
                   </View>

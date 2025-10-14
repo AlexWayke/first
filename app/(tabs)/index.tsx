@@ -1,30 +1,30 @@
-import { client, COMPLETIONS_COLLECTION_ID, DATABASE_ID, databases, HABITS_COLLECTION_ID, RealtimeResponse } from "@/lib/appwrite";
+import { client, DATABASE_ID, databases, HABITS_COLLECTION_ID, RealtimeResponse } from "@/lib/appwrite";
 import { useAuth } from "@/lib/auth-context";
 import { Habit } from "@/types/database.type";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Query } from "appwrite";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, StyleSheet, ScrollView } from "react-native";
-import { Swipeable } from "react-native-gesture-handler";
+import Swipeable, {SwipeableMethods} from "react-native-gesture-handler/ReanimatedSwipeable";
 import { Text, Button, Surface } from "react-native-paper";
 
 export default function Index() {
   const { signOut, user } = useAuth();
   const [habits, setHabits] = useState<Habit[]>();
 
-  const swipeableRefs = useRef<{[key: string]: Swipeable | null}>({})
+  const swipeableRefs = useRef<{[key: string]: SwipeableMethods | null}>({})
 
   const fetchHabits = useCallback(async () => {
     try{
-      const response = await databases.listDocuments(
-        DATABASE_ID!, 
-        HABITS_COLLECTION_ID!,
-        [Query.equal("user_id", user?.$id ?? "")]
-      );
+      const response = await databases.listRows({
+        databaseId: DATABASE_ID!, 
+        tableId: HABITS_COLLECTION_ID!,
+        queries: [Query.equal("user_id", user?.$id ?? "")]
+      });
 
-      setHabits(response.documents as Habit[]);
-    } catch (error) {
-      console.error(error)
+      setHabits(response.rows as Habit[]);
+    } catch (err) {
+      console.error(err)
     }
   }, [user?.$id]);
 
@@ -41,9 +41,9 @@ export default function Index() {
     if (user) {
       const habbitsChannel = `databases.${DATABASE_ID}.collections.${HABITS_COLLECTION_ID}.documents`;
       const habitSubscription = client.subscribe(habbitsChannel, (response: RealtimeResponse) => {
-        if (response.events.includes("databases.*.collections.*.documents.*.create") ||
-          response.events.includes("databases.*.collections.*.documents.*.update") ||
-          response.events.includes("databases.*.collections.*.documents.*.delete")
+        if (response.events.includes("databases.*.tables.*.rows.*.create") ||
+          response.events.includes("databases.*.tables.*.rows.*.update") ||
+          response.events.includes("databases.*.tables.*.rows.*.delete")
         ) {
           fetchHabits();
         }
@@ -78,10 +78,10 @@ export default function Index() {
 
   const handleDeleteHabit = async (id: string) => {
     try {
-      await databases.deleteDocument({
+      await databases.deleteRow({
         databaseId: DATABASE_ID!, 
-        collectionId: HABITS_COLLECTION_ID!, 
-        documentId: id
+        tableId: HABITS_COLLECTION_ID!, 
+        rowId: id
       })
     } catch(err) {
       console.error(err);
@@ -93,21 +93,24 @@ export default function Index() {
     try {
       const currentDate = new Date().toISOString();
       const habit = habits?.find((h) => h.$id === id);
-      console.log('habit', habit)
       
       if (!habit) return;
       const habitUpdatedDate = habit.last_completed;
+      const gapInDays = Math.floor((+new Date(currentDate) - +new Date(habitUpdatedDate)) / (1000 * 60 * 60 * 24));
+      const currentStreak = gapInDays > 1 ? 1 : habit.streak_count + 1;
+      const bestStreak = currentStreak > habit.best_streak ? currentStreak : habit.best_streak;
       
       if(currentDate.split('T')[0] === habitUpdatedDate.split('T')[0]) return;
-      await databases.updateDocument(
-        DATABASE_ID!,
-        HABITS_COLLECTION_ID!, 
-        id, 
-        {
-          streak_count: habit.streak_count + 1,
+      await databases.updateRow({
+        databaseId: DATABASE_ID!,
+        tableId: HABITS_COLLECTION_ID!, 
+        rowId: id, 
+        data: {
+          streak_count: currentStreak,
           last_completed: currentDate,
+          best_streak: bestStreak,
         }
-      )
+      })
 
     } catch(err) {
       console.error(err);
@@ -135,11 +138,12 @@ export default function Index() {
               renderLeftActions={renderLeftActions}
               renderRightActions={() => renderRightActions(habit.$id)}
               onSwipeableOpen={(direction) => {
-                if(direction === "left"){
+                if(direction === "right"){
                   handleDeleteHabit(habit.$id);
-                } else if (direction === "right") {
+                } else if (direction === "left") {
                   handleCompleteHabit(habit.$id)
                 }
+
                 swipeableRefs.current[habit.$id]?.close();
               }}
             >
